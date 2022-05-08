@@ -1,4 +1,5 @@
 <?php
+defined('ABSPATH') || exit;
 
 /*
 Plugin Name: XML Parser Framework
@@ -9,6 +10,12 @@ Author: Július Sipos
 Author URI: https://jsdizajner.com/
 Text Domain: jsd-parser
 */
+
+// If used get_plugin_data include WP PLUGIN.php
+if (!function_exists('get_plugin_data')) {
+	require_once(ABSPATH . 'wp-admin/includes/plugin.php');
+}
+
 
 define('JSD_PARSER_FRAMEWORK_DIR', plugin_dir_path(__FILE__));
 define('JSD_PARSER_PLUGIN_DATA', get_plugin_data(__FILE__));

@@ -1,4 +1,5 @@
 <?php
+defined('ABSPATH') || exit;
 
 $config = [
     '_xml_name'             => 'brel',
