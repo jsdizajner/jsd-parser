@@ -68,16 +68,11 @@ function cfwc_save_custom_field($post_id)
 }
 add_action('woocommerce_process_product_meta', 'cfwc_save_custom_field');
 
-function jsd_admin_style()
-{
-    $url = get_option('siteurl') . '/wp-content/plugins/' . JSD__PARSER_CORE::$info['slug'] . JSD__PARSER_CORE::$info['style'];
-    echo '<!-- JSDIZAJNER ADMIN -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
-    <link rel="stylesheet" type="text/css" href="' . $url . '" />
-    <!-- /end JSDIZAJNER ADMIN -->';
-}
 
-add_action('admin_head', 'jsd_admin_style');
+
+
+
+
 
 
  

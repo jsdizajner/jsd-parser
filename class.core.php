@@ -43,7 +43,6 @@ class JSD__PARSER_CORE
         $MyUpdateChecker->getVcsApi()->enableReleaseAssets();
 	}
 
-    
 }
 
 ?>
