@@ -1,0 +1,83 @@
+<?php
+
+/*
+Plugin Name: XML Parser Framework
+Plugin URI: https://jsdizajner.com/
+Description: JSD XML Parser
+Version: 1.0.0
+Author: Július Sipos
+Author URI: https://jsdizajner.com/
+Text Domain: jsd-parser
+*/
+
+define('JSD_PARSER_FRAMEWORK_DIR', plugin_dir_path(__FILE__));
+define('JSD_PARSER_PLUGIN_DATA', get_plugin_data(__FILE__));
+
+require __DIR__ . '/vendor/autoload.php';
+require 'class.core.php';
+require 'class.xml.php';
+require 'class.helper.php';
+require 'class.factory.php';
+
+function framework_settings_add_plugin_page()
+{
+    add_menu_page(
+        'XML Parser', // page_title
+        'XML Parser', // menu_title
+        'manage_options', // capability
+        'jsdizajner-xml-parser', // menu_slug
+        'create_admin_page_xml_parser', // function
+        'dashicons-database-import', // icon_url
+        99 // position
+    );
+}
+
+// Load Feature after Fields are Registered
+add_action('admin_menu', 'framework_settings_add_plugin_page');
+
+function create_admin_page_xml_parser()
+{
+    include(JSD_PARSER_FRAMEWORK_DIR . 'admin-page.php');
+}
+
+/**
+ * Displays the custom text field input field in the WooCommerce product data meta box
+ */
+function parcer_unique_id_field()
+{
+    $args = array(
+        'id' => '_unique_import_id_field',
+        'label' => __('Unique Import ID', 'jsd-parser'),
+        'class' => '__jsd_parcer_unique_id_field_input',
+        'desc_tip' => true,
+        'description' => __('Do not change or manipalte this data!', 'jsd-parser'),
+    );
+    woocommerce_wp_text_input($args);
+}
+add_action('woocommerce_product_options_general_product_data', 'parcer_unique_id_field');
+
+/**
+ * Saves the custom field data to product meta data
+ */
+function cfwc_save_custom_field($post_id)
+{
+    $product = wc_get_product($post_id);
+    $title = isset($_POST['_unique_import_id_field']) ? $_POST['_unique_import_id_field'] : '';
+    $product->update_meta_data('_unique_import_id_field', sanitize_text_field($title));
+    $product->save();
+}
+add_action('woocommerce_process_product_meta', 'cfwc_save_custom_field');
+
+function jsd_admin_style()
+{
+    $url = get_option('siteurl') . '/wp-content/plugins/' . JSD__PARSER_CORE::$info['slug'] . JSD__PARSER_CORE::$info['style'];
+    echo '<!-- JSDIZAJNER ADMIN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="' . $url . '" />
+    <!-- /end JSDIZAJNER ADMIN -->';
+}
+
+add_action('admin_head', 'jsd_admin_style');
+
+
+ 

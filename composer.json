@@ -1,0 +1,6 @@
+{
+    "require": {
+        "automattic/woocommerce": "^3.1",
+        "yahnis-elsts/plugin-update-checker": "^4.11"
+    }
+}
