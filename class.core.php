@@ -32,7 +32,7 @@ class JSD__PARSER_CORE
 	{
 
 		require JSD_PARSER_FRAMEWORK_DIR . '/vendor/yahnis-elsts/plugin-update-checker/plugin-update-checker.php';
-		$myUpdateChecker = Puc_v4_Factory::buildUpdateChecker(
+		$MyUpdateChecker = Puc_v4_Factory::buildUpdateChecker(
 			'https://github.com/jsdizajner/jsd-parser',
 			self::$info['plugin_file_path'], //Full path to the main plugin file or functions.php.
 			self::$info['slug']

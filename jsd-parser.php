@@ -19,6 +19,9 @@ require 'class.xml.php';
 require 'class.helper.php';
 require 'class.factory.php';
 
+// Initiate Core Framework Functionality
+new JSD__PARSER_CORE();
+
 function framework_settings_add_plugin_page()
 {
     add_menu_page(
