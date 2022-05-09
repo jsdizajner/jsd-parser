@@ -113,15 +113,15 @@ class JSD__PARSER_FACTORY
             'iterations' => $total, 
         ];
 
-        for ($position = 0; $position < $total; $position++ ) 
-        {
+        while ($position < $total) :
             for ($position; $position < $total; $position++) 
             {
                 if ($this->importer === 'native') : $this->import_products_wp_native_method($data_sets[$position], $position); endif;
                 if ($this->importer === 'wc_product') : $this->import_product_data($data_sets[$position]); endif;
                 break;
             }
-        }
+            $position++;
+        endwhile;
 
         $this->create_report();
     }
