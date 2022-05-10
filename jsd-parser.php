@@ -5,7 +5,7 @@ defined('ABSPATH') || exit;
 Plugin Name: XML Parser Framework
 Plugin URI: https://jsdizajner.com/
 Description: JSD XML Parser
-Version: 1.0.0
+Version: 1.0.2
 Author: Július Sipos
 Author URI: https://jsdizajner.com/
 Text Domain: jsd-parser
