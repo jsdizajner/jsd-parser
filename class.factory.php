@@ -6,21 +6,8 @@ use Automattic\WooCommerce\HttpClient\HttpClientException;
 
 class JSD__PARSER_FACTORY
 {
-
-    /**
-     * WooCommerce REST API
-     */
-    private $ck = 'ck_cdf63f1e2ef981b12be27ad8537c385f86453113';
-    private $cs = 'cs_e9a7f6d5cacb181d585b66ce62df248575cb63e9';
-    private $url = 'https://parcer.local/';
-
-    public $type;
-    public $WPoption;
-    public $current = [];
-    public $imported_products;
-    public $report_name;
-    public $importer;
-    public $cycle_metadata;
+    public $api_name;
+    public static $wp_options_slugs = [];
     public $default = [
         'category_id' => 999,
         'image_src' => [
@@ -32,43 +19,36 @@ class JSD__PARSER_FACTORY
      * Initiate XML Factory
      *
      * @param array $config
+     * @param array $products
      * @return void
      */
-    public function __construct($config)
+    public function __construct($config, $products)
     {
+        $wp_options_slugs = $this->create_options_slugs($config['_xml_name']);
+        self::$wp_options_slugs = $wp_options_slugs;
 
-        $woocommerce = $this->load_api();
-        $this->type = $config['type'];
-        $this->importer = $config['importer'];
-        $this->WPoption = 'jsd_xml_parser_current_data_' . $config['_xml_name'];
-        $this->report_name = 'jsd_xml_parser_report_' . $config['_xml_name'];
+        // After First initiation of the plugin, create blank data
+        if (get_option($wp_options_slugs['initiated_implementation']) === false) :
+            foreach ($wp_options_slugs as $slug) {
+                add_option($slug, []);
+            }
+            update_option($wp_options_slugs['cycle_next_position'], 0);
+            update_option($wp_options_slugs['cycle_is_finished'], false);
+            update_option($wp_options_slugs['report_name'], false);
 
-        /**
-         * Load Current Data
-         */
-
-        // Current Products
-        if ($config['auto_update'] === true ) : 
-            delete_option($this->WPoption); delete_option('__jsd_xml_parcer_eshop_categories'); delete_option('__jsd_xml_parcer_eshop_attributes'); 
-            $this->get_current_products($this->type);
-            $this->get_current_product_categories();
-            $this->get_current_product_attributes($woocommerce);
+            JSD__PARSER_FACTORY::get_current_data($config['auto_update']);
         endif;
 
-        if (get_option($this->WPoption) === false) : $this->get_current_products($this->type); endif;
-        $this->current['products'] = get_option($this->WPoption);
+        // Save config file to DB
+        update_option($wp_options_slugs['implementation_config'], $config);
 
-        // Current Categories
-        if (get_option('__jsd_xml_parcer_eshop_categories') === false) : $this->get_current_product_categories(); endif;
-        $this->current['categories'] = get_option('__jsd_xml_parcer_eshop_categories');
+        // Parsed XML Products to DB
+        update_option($wp_options_slugs['products_from_xml'], $products);
 
-        // Current attributes
-        if (get_option('__jsd_xml_parcer_eshop_attributes') === false) : $this->get_current_product_attributes($woocommerce); endif;
-        $this->current['attributes'] = get_option('__jsd_xml_parcer_eshop_attributes');
-
-        // If there is no report return blank array
-        if (get_option($this->report_name) === false ) : add_option($this->report_name, []); endif;
-
+        // Prepare Cycle Data
+        update_option($wp_options_slugs['cycle_chunks'], $config['chunks'] );
+        update_option($wp_options_slugs['cycle_product_type'], $config['product_type'] );
+        update_option($wp_options_slugs['cycle_importer_type'], $config['importer_type'] );
     }
 
     /**
@@ -76,350 +56,21 @@ class JSD__PARSER_FACTORY
      *
      * @return object WooCommerce API Connection
      */
-    public function load_api()
+    public static function load_api()
     {
-
         $woocommerce = new Client(
-            $this->url,
-            $this->ck,
-            $this->cs,
+            'https://parcer.local/',
+            'ck_5b3cfd612cf39c0cafeb4b45a492c20e5b0ac013',
+            'cs_3d65ffab0f702ed70321a25d658da43bba6e9e20',
             [
                 'wp_api' => true,
                 'version' => 'wc/v3',
                 'verify_ssl' => false,
-                'timeout' => 120,
+                'timeout' => 500,
             ]
         );
 
         return $woocommerce;
-    }
-
-    /**
-     * Start Importer loop, define chunks of products, run the loop
-     *
-     * @param array $products
-     * @param int $chunks
-     * @return void
-     */
-    public function importer($products, $chunks)
-    {
-        $data_sets = array_chunk($products, $chunks);
-        $position = 0;
-        $total = count($data_sets);
-
-        // Collect Metadata for this cycle setup
-        $this->cycle_metadata = [
-            'chunks' => $chunks, 
-            'iterations' => $total, 
-        ];
-
-        while ($position < $total) :
-            for ($position; $position < $total; $position++) 
-            {
-                if ($this->importer === 'native') : $this->import_products_wp_native_method($data_sets[$position], $position); endif;
-                if ($this->importer === 'wc_product') : $this->import_product_data($data_sets[$position]); endif;
-                break;
-            }
-            $position++;
-        endwhile;
-
-        $this->create_report();
-    }
-
-    /**
-     * Import Products using WC_Product Class
-     *
-     * @param array $products
-     * @return void
-     */
-    public function import_product_data($products)
-    {
-        try {
-
-            // Initiate API Connection
-            $woocommerce = $this->load_api();
-
-            $importedProducts = [];
-            $productCounter = 0;
-
-            if ($this->type === 'simple') {
-        
-                foreach ($products as $product) {
-                    // Prepare Attributes
-                    if ($product['attributes'] != false) { 
-                        $data = $this->check_attributes($product['attributes'], $this->type, $woocommerce);
-                        $product['attributes'] = $data;
-                    }
-                    if ($product['attributes'] === false) : unset($product['attributes']); endif;
-
-                    // Prepare Categories
-                    if ($product['categories'] != false) {
-                        $categories = $this->check_categories($product['categories'], $this->current['categories']);
-                        $product['categories'] = $categories;
-                    }
-
-                    if ($product['categories'] === false) : $product['categories'] = [$this->default['category_id']]; endif;
-
-                    // Prepare Images
-                    if (isset($product['images'])) {
-                        if (is_array($product['images'])) {
-                            $image_ids = []; $i = 0;
-                            foreach ($product['images'] as $image) { 
-                                $image_ids[$i] = $this->upload_image_to_gallery($image['src']);
-                            }
-                        }
-                        $image_ids = $this->upload_image_to_gallery($product['images'][0]['src']);
-                        $product['images'] = $image_ids;
-                    }
-
-                    if ($product['exist']['exist'] === true) : 
-                        $this->update_product($product);
-                    endif;
-
-                    if ($product['exist']['exist'] === false) :
-                        $this->create_product($product);
-                    endif;
-
-                }
-
-            }
-
-            return $productCounter;
-
-        }    
-        catch (HttpClientException $e) {
-
-            /**
-             * Log the failed process into DB as WP_OPTIONS '__jsd_xml_parcer_svorto'
-             */
-            
-            $SQLoptions = [
-                'e_message' => $e->getMessage(),
-                'e_code'    => $e->getCode(),
-                'e_trace'   => $e->getTraceAsString(),
-                'product_data'  => $product,
-            ];
-            echo '<pre>';
-            var_dump($SQLoptions);
-            echo '</pre>';
-        }
-    }
-
-    /**
-     * Import Products using wp_post function
-     *
-     * @param array $product_array
-     * @return void
-     */
-    public function import_products_wp_native_method($product_array, $iteration)
-    {
-        if (!empty($product_array)) :
-
-            if ($iteration === 0) : $counter = $iteration; 
-            elseif ($iteration === 1) : $counter = $this->cycle_metadata['chunks']; 
-            elseif ($iteration > 1) : $counter = $iteration * $this->cycle_metadata['chunks']; 
-            endif;
-
-            foreach ($product_array as $product) :
-
-                // Prepare Images
-                if (isset($product['images'])) {
-                    if (is_array($product['images'])) {
-                        $image_ids = []; $i = 0;
-                        foreach ($product['images'] as $image) { 
-                            $image_ids[$i] = $this->upload_image_to_gallery($image['src']);
-                        }
-                    }
-                    $image_ids = $this->upload_image_to_gallery($product['images'][0]['src']);
-                    $product['images'] = $image_ids;
-                }
-
-                // Create Product
-                if ($product['exist']['exist'] === false) :
-                    $post = [
-                        'post_content' => $product['description'],
-                        'post_status' => "publish",
-                        'post_title' => wp_strip_all_tags($product['name']),
-                        'post_name' => $product['name'],
-                        'post_parent' => '',
-                        'post_type' => "product",
-                    ];
-                    //Create Post
-                    $product_id = wp_insert_post($post);
-
-                    //set Product Image
-                    set_post_thumbnail($product_id, $product['images'] );
-
-                    //set Product Category
-                    wp_set_object_terms($product_id, $product['categories'], 'product_cat');
-
-                    //set product type
-                    wp_set_object_terms($product_id, 'simple', 'product_type');
-
-                    update_post_meta($product_id, '_visibility', 'visible');
-                    update_post_meta($product_id, '_stock_status', $product['stock_status']);
-                    update_post_meta($product_id, '_manage_stock', $product['manage_stock']);
-                    update_post_meta($product_id, '_price', $product['price']);
-
-                    if (isset($product['attributes'])) : update_post_meta($product_id, '_product_attributes', $product['attributes']); endif;
-                    if (isset($product['_stock'])) : update_post_meta($product_id, '_stock', $product['_stock']); endif;
-
-                    foreach ($product['meta_data'] as $metadata) {
-                        update_post_meta($product_id, $metadata['key'], $metadata['value']);
-                    }
-
-                    $this->imported_products[$counter] = [
-                        'product_id'    => $product_id,
-                        'jsd_id'        => $product['jsd_id'],
-                        'name'          => $product['name'],
-                        'ean'           => $product['ean'],
-                        'status'        => 'Added',
-                    ];
-
-                // Update Product
-                else :
-                    $post = [
-                        'ID' => $product['id'],
-                        'post_title' => $product['name'],
-                        'post_content' => $product['description'],
-                    ];
-
-                    update_post_meta($product['id'], '_stock_status', $product['stock_status']);
-                    update_post_meta($product['id'], '_price', $product['price']);
-
-                    $post_id = wp_update_post($post, true);
-
-                    $this->imported_products[$counter] = [
-                        'product_id'    => $product['id'],
-                        'jsd_id'        => $product['jsd_id'],
-                        'name'          => $product['name'],
-                        'ean'           => $product['ean'],
-                        'status'        => 'Updated',
-                    ];
-
-                    if (is_wp_error($post_id))
-                    {
-                        $errors = $post_id->get_error_messages();
-                        foreach ($errors as $error)
-                        {
-                            echo $error;
-                        }
-                    }
-                endif;
-
-                $counter++;
-
-            endforeach;
-
-        endif;
-    }
-
-    /**
-     * Programatically create product using WC_Product Class
-     *
-     * @param array $data Prepared Product Data
-     * @return bool
-     */
-    public static function create_product($product)
-    {
-
-        $woo = new WC_Product();
-        $woo->set_name($product['name']);
-        $woo->set_price($product['price']);
-        $woo->set_regular_price($product['price']);
-        $woo->set_description($product['description']);
-        $woo->set_catalog_visibility('visible');
-        $woo->set_stock_status($product['stock_status']);
-        $woo->set_short_description($product['short_description']);
-        $woo->set_category_ids(array_map('intval', $product['categories']));
-        if (isset($product['attributes'])) : $woo->set_attributes($product['attributes']); endif;
-        $woo->set_image_id($product['images']);
-        foreach ($product['meta_data'] as $metadata) {
-            $woo->update_meta_data($metadata['key'], $metadata['value']);
-        }
-        $woo->set_meta_data($product['meta_data']);
-        return $woo->save();
-    }
-
-    /**
-     * Programatically update product using WC_Product Class
-     *
-     * @param array $product Prepared Product Data
-     * @param int $id Product ID
-     * @return bool
-     */
-    public static function update_product($product)
-    {  
-        $woo = new WC_Product($product['id']);
-        $woo->set_price($product['price']);
-        $woo->set_regular_price($product['price']);
-        $woo->set_stock_status($product['stock_status']);
-        foreach ($product['meta_data'] as $metadata) {
-            $woo->update_meta_data($metadata['key'], $metadata['value']);
-        }
-        $woo->set_meta_data($product['meta_data']);
-        return $woo->save();
-    }
-
-    /**
-     * If there are no product found by name, import them
-     *
-     * @param array $data
-     * @param object $woocommerce
-     * @return json
-     */
-    public function create_products($data, $woocommerce)
-    {
-        return $woocommerce->post('products', $data);
-    }
-
-    /**
-     * If there are no matches in EAN, create new variation
-     *
-     * @param int $productID
-     * @param array $data
-     * @param object $woocommerce
-     * 
-     * @return json
-     */
-    public function create_variations($productID, $data, $woocommerce)
-    {
-        return $woocommerce->post('products/' . (string) $productID  . '/variations', $data);
-    }
-
-    /**
-     * When there is a match in EAN within variations, just update the data
-     *
-     * @param int $productID
-     * @param int $varationID
-     * @param array $data
-     * @param object $woocommerce
-     * @return json
-     */
-    public function update_variations($productID, $varationID, $data, $woocommerce)
-    {
-        return $woocommerce->put('products/' . $productID  . '/variations' . '/' . $varationID, $data);
-    }
-
-    /**
-     * When there are no attributes found by name, create new attribute
-     *
-     * @param string $attribute
-     * @param object $woocommerce
-     * @return int $id->id 
-     */
-    public function create_attribute($attribute, $woocommerce)
-    {
-        $data = [
-            'name'      => (string) $attribute,
-            'slug'      => 'svorto_' . $this->create_slug($attribute),
-            'type'      => 'select',
-            'order_by'  => 'menu_order',
-            'has_archives' => true,
-        ];
-
-        $id = $woocommerce->post('products/attributes', $data);
-        return $id->id;
     }
 
     /**
@@ -429,7 +80,7 @@ class JSD__PARSER_FACTORY
      * @param object $woocommerce
      * @return int
      */
-    public function get_attribute_id($attribute, $woocommerce)
+    public static function get_attribute_id($attribute, $woocommerce)
     {
         // Invalid Input
         if (empty($attribute) or !is_array($attribute)) : return 'Invalid Attribute input'; endif;
@@ -454,13 +105,36 @@ class JSD__PARSER_FACTORY
     }
 
     /**
+     * Gather local data from the store
+     *
+     * @param boolean $force
+     * @return void
+     */
+    public static function get_current_data($force = false)
+    {  
+        if ($force === true) :
+            delete_option(JSD__PARSER_CORE::$current_data['current_eshop_products']);
+            delete_option(JSD__PARSER_CORE::$current_data['current_eshop_products']);
+            delete_option(JSD__PARSER_CORE::$current_data['current_eshop_products']);
+        endif;
+        // Current Products
+        if (get_option(JSD__PARSER_CORE::$current_data['current_eshop_products']) === false) : self::get_current_products(JSD__PARSER_CORE::$current_data['current_eshop_products']); endif;
+
+        // Current Categories
+        if (get_option(JSD__PARSER_CORE::$current_data['current_eshop_categories']) === false) : self::get_current_product_categories(JSD__PARSER_CORE::$current_data['current_eshop_categories']); endif;
+
+        // Current attributes
+        if (get_option(JSD__PARSER_CORE::$current_data['current_eshop_attributes']) === false) : self::get_current_product_attributes(JSD__PARSER_CORE::$current_data['current_eshop_attributes']); endif;
+    }
+
+    /**
      * Assign Category ID
      *
      * @param array $category
      * @param object $woocommerce
      * @return  array Category ID
      */
-    public function get_category_id($category, $woocommerce)
+    public static function get_category_id($category, $woocommerce)
     {
         // Invalid Input
         if (empty($category) or !is_array($category)) : return 'Invalid Category input'; endif;
@@ -493,7 +167,7 @@ class JSD__PARSER_FACTORY
      * @param string $key
      * @return array $temp_array
      */
-    public function unique_multidim_array($array, $key)
+    public static function unique_multidim_array($array, $key)
     {
         $temp_array = array();
         $i = 0;
@@ -517,7 +191,7 @@ class JSD__PARSER_FACTORY
      * @param string $term
      * @return string $term
      */
-    public function attribute_term($id, $term)
+    public static function attribute_term($id, $term)
     {
         if (empty($term)) {
             $term = '1';
@@ -527,117 +201,12 @@ class JSD__PARSER_FACTORY
     }
 
     /**
-     * Check attributes from eshop by name
-     * 
-     * @param array $attributes
-     * @param string $type
-     * @param object $woocommerce
-     * @return array [int]
-     */
-    public function check_attributes($attributes, $type, $woocommerce)
-    {
-
-        // Assign IDs from Attributes
-        $i = 0;
-        $attIDs = [];
-        foreach ($attributes as $attribute) {
-            $attIDs[$i] = $attribute;
-            $attIDs[$i]['id'] = $this->get_attribute_id($attribute, $woocommerce);
-            $i++;
-        }
-
-        // Prepare Attribute Options
-        $options = [];
-        $i = 0;
-        foreach ($attIDs as $att) {
-            $options[$att['id']][$i] = $att['value'];
-            $i++;
-        }
-
-
-        // Find unique Attributes from $attributes
-        $unique = $this->unique_multidim_array($attIDs, 'name');
-
-
-        // Map Attributes and Options
-        $final = [];
-        switch ($type) {
-            case 'simple':
-                $counter = 0;
-                foreach ($unique as $att) {
-                    $final[$counter] = [
-                        'id' => $att['id'],
-                        'variation' => false,
-                        'visible'   => true,
-                        'options'   => array_values($options[$att['id']])
-                    ];
-                    $counter++;
-                }
-
-                // Returned mapped attributes
-                return $final;
-            break;
-
-            case 'variable':
-                $counter = 0;
-                foreach ($unique as $att) {
-                    $final[$counter] = [
-                        'id' => $att['id'],
-                        'variation' => true,
-                        'visible'   => true,
-                        'options'   => array_values($options[$att['id']])
-                    ];
-                    $counter++;
-                }
-
-                // Returned mapped attributes
-                return $final;
-            break;
-            
-            default:
-                $counter = 0;
-                foreach ($unique as $att) {
-                    $final[$counter] = [
-                        'id' => $att['id'],
-                        'variation' => false,
-                        'visible'   => true,
-                        'options'   => array_values($options[$att['id']])
-                    ];
-                    $counter++;
-                }
-
-                // Returned mapped attributes
-                return $final;
-            break;
-        }
-
-    }
-
-    /**
-     * Check stock status from XML Data
-     * 
-     * @param string $stock
-     * @param array $config
-     * @return string 'instock' || 'outofstock' || 'onbackorder'
-     */
-    public function get_stock_status($stock, $config)
-    {
-        if ($stock === $config['instock']) {
-            return 'instock';
-        } elseif ($stock === $config['outofstock']) {
-            return 'outofstock';
-        } elseif ($stock === $config['onbackorder']) {
-            return 'onbackorder';
-        }
-    }
-
-    /**
      * Get all images from XML and put them in array
      * 
      * @param array $images
      * @return array $imagesFormatted
      */
-    public function get_product_images($images, $config)
+    public static function get_product_images($images, $config)
     {
         if ($config === 'single') {
             foreach ($images as $image) {
@@ -685,7 +254,7 @@ class JSD__PARSER_FACTORY
      * @param object $woocommerce
      * @return array $imported
      */
-    public function check_categories($categories, $woocommerce)
+    public static function check_categories($categories, $woocommerce)
     {
 
         // Assign IDs from categories
@@ -713,7 +282,7 @@ class JSD__PARSER_FACTORY
      * @param object $woocommerce
      * @return [int] 
      */
-    public function create_category($category, $woocommerce)
+    public static function create_category($category, $woocommerce)
     {
         $data = [
             'name'      => (string) $category,
@@ -728,7 +297,7 @@ class JSD__PARSER_FACTORY
      *
      * @return  array  Collection of current Products in Pages (100 items per page)
      */
-    public function get_current_products($type)
+    public static function get_current_products($option)
     {
         global $wpdb;
         $data = $wpdb->get_results("SELECT 
@@ -751,7 +320,7 @@ class JSD__PARSER_FACTORY
             $final[$i] = $set;
             $i++;
         }
-        update_option($this->WPoption, $final);
+        update_option($option, $final);
     }
 
     /**
@@ -761,10 +330,11 @@ class JSD__PARSER_FACTORY
      * @return  array  Collection of current Product Attributes
      * @docs https://woocommerce.github.io/woocommerce-rest-api-docs/#list-all-product-attributes
      */
-    public function get_current_product_attributes($woocommerce)
+    public static function get_current_product_attributes($option)
     {
+        $woocommerce = self::load_api();
         $currentAttributes = $woocommerce->get('products/attributes/');
-        return update_option('__jsd_xml_parcer_eshop_attributes', $currentAttributes);
+        return update_option($option, $currentAttributes);
     }
 
     /**
@@ -772,7 +342,7 @@ class JSD__PARSER_FACTORY
      *
      * @return void;
      */
-    public function get_current_product_categories()
+    public static function get_current_product_categories($option)
     {
         global $wpdb;
         $data = $wpdb->get_results("SELECT wp_term_taxonomy.term_id, wp_terms.name FROM wp_term_relationships 
@@ -783,7 +353,7 @@ class JSD__PARSER_FACTORY
         order by wp_terms.name", ARRAY_A);
 
         $data['last_update'] = date('d-m-Y');
-        update_option('__jsd_xml_parcer_eshop_categories', $data);
+        update_option($option, $data);
 
         return $data['last_update'];
     }
@@ -795,7 +365,7 @@ class JSD__PARSER_FACTORY
      * @param array $shopProducts
      * @return array ['exist' => bool, 'id' => int] 
      */
-    public function check_product_slug($slug, $shopProducts)
+    public static function check_product_slug($slug, $shopProducts)
     {
 
         // If there are no products
@@ -832,7 +402,7 @@ class JSD__PARSER_FACTORY
      * 
      * @return string $name or 'n-a'
      */
-    public function create_slug($name, $divider = '-')
+    public static function create_slug($name, $divider = '-')
     {
 
         // replace non letter or digits by divider
@@ -861,77 +431,32 @@ class JSD__PARSER_FACTORY
     }
 
     /**
-     * Calculate the price of the product
+     * Creates unique slugs for WP OPTIONS
      *
-     * @param float $price
-     * @param int $q
-     * @return string $finalPrice
+     * @param string $api_name
+     * @return array $wp_options_slugs
      */
-    public function calculate_price($price, $q)
-    {  
-        $price = str_replace(',', '.', $price);
-        return (float)$price * $q;
-    }
-
-    /**
-     * Create unique import id from input
-     * ID is used for productExist Check
-     *
-     * @param mixed $id input ID
-     * @return string Unique MetaData ID
-     */
-    public function create_unique_import_id($id)
+    public static function create_options_slugs($api_name)
     {
-        return 'JSD__' . $id;
-    }
+        // Initiate Variable
+        $wp_options_slugs = [];
 
-    /**
-     * Parce UTF-8 to HTML5
-     *
-     * @param string $description UTF-8 Description
-     * @return string Decoded HTML5 Code
-     */
-    public function get_description($description)
-    {
-        $decode = htmlspecialchars_decode($description, ENT_HTML5);
-        return $decode;
-    }
+        // Assign slugs
+        $wp_options_slugs['implementation_config']      = 'jsd_parser_implementation_config_' . $api_name;
+        $wp_options_slugs['initiated_implementation']   = 'jsd_parser_init_client_' . $api_name;
+        $wp_options_slugs['imported_products']          = 'jsd_parser_imported_products_' . $api_name;
+        $wp_options_slugs['products_from_xml']          = 'jsd_parser_xml_products_' . $api_name;
+        $wp_options_slugs['report_name']                = 'jsd_parser_report_' . $api_name;
+        $wp_options_slugs['cycle_last_position']        = 'jsd_parser_cycle_last_position_' . $api_name;
+        $wp_options_slugs['cycle_next_position']        = 'jsd_parser_cycle_next_position_' . $api_name;
+        $wp_options_slugs['cycle_is_finished']          = 'jsd_parser_cycle_is_finished_' . $api_name;
+        $wp_options_slugs['cycle_report_data']          = 'jsd_parser_cycle_report_data_' . $api_name;
+        $wp_options_slugs['cycle_product_type']         = 'jsd_parser_cycle_product_type_' . $api_name;
+        $wp_options_slugs['cycle_importer_type']        = 'jsd_parser_cycle_importer_type_' . $api_name;
+        $wp_options_slugs['cycle_chunks']               = 'jsd_parser_cycle_chunks_' . $api_name;
 
-    /**
-     * Check if product exist based on unique importer ID
-     *
-     * @param string  $id  Unique ID - mostly $jsdID
-     * @return bool
-     */
-    public function check_if_product_exist($id)
-    {
-        if (empty($id)) : return null; endif;
-        $status = [
-            'exist' => false,
-            'id'    => null,
-        ];
-        for ($i = 0; $i < count($this->current['products']); $i++) {
-            if ($this->current['products'][$i]['jsd_id'] === $id) :
-                $status = ['exist' => true, 'id' => $this->current['products'][$i]['ID']];
-            endif;
-
-            if ($this->current['products'][$i]['jsd_id'] === null) :
-                $status = ['exist' => false, 'id' => null];
-            endif;
-        } 
-        return $status;
-    }
-
-    /**
-     * Create a report from last cycle
-     *
-     * @return void
-     */
-    public function create_report()
-    {
-        // Prepare Report
-        $report = array_chunk($this->imported_products, 25);
-        update_option($this->report_name, $report);
+        // Return slugs
+        return $wp_options_slugs;
     }
 
 }

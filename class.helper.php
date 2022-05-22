@@ -3,29 +3,6 @@ defined('ABSPATH') || exit;
 
 class JSD__PARSER_HELPERS
 {
-
-   /**
-    * Filter product by set category
-    *
-    * @param array $list_of_categories
-    * @param array $input
-    * @return bool
-    */
-   public static function filter_product_by_categories($list_of_categories, $input = [])
-   {
-
-      if (is_string($input)) {
-         if (in_array($input, $list_of_categories)) : return true; endif;
-      } 
-
-      foreach ($list_of_categories as $filtered_category) {
-         if (in_array($filtered_category, $input)) : return true; endif;
-      }
-
-      return false;
-   
-   }
-
    /**
     * Is URL 404
     *
