@@ -5,7 +5,7 @@ defined('ABSPATH') || exit;
 Plugin Name: XML Parser Framework
 Plugin URI: https://jsdizajner.com/
 Description: JSD XML Parser
-Version: 1.1.2
+Version: 1.1.3
 Author: Július Sipos
 Author URI: https://jsdizajner.com/
 Text Domain: jsd-parser
@@ -79,6 +79,9 @@ function cfwc_save_custom_field($post_id)
     $product->save();
 }
 add_action('woocommerce_process_product_meta', 'cfwc_save_custom_field');
+		
+// Load All imeplementations
+require_once JSD_PARSER_FRAMEWORK_DIR . '/implementations/brel.php';
 
 
 

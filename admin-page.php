@@ -11,20 +11,8 @@ if (isset($_POST['run_importer'])) {
 ?>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
 
-<?php
-// foreach (JSD__PARSER_FACTORY::$wp_options_slugs as $key => $value) {
-//     echo '<pre>';
-//     echo $key;
-    
-//     echo '</pre>';
-// }
-var_dump(get_option(JSD__PARSER_FACTORY::$wp_options_slugs['cycle_next_position']));
-var_dump(get_option(JSD__PARSER_FACTORY::$wp_options_slugs['cycle_is_finished']));
-$config = get_option(JSD__PARSER_FACTORY::$wp_options_slugs['implementation_config']);
+<?php $config = get_option(JSD__PARSER_FACTORY::$wp_options_slugs['implementation_config']); ?>
 
-
-
-?>
 <section class="import my-5 py-5">
     <section class="container">
         <div class="row">
@@ -37,6 +25,25 @@ $config = get_option(JSD__PARSER_FACTORY::$wp_options_slugs['implementation_conf
                                 <h6 class="text-black"><?php echo __('API Connection:', 'jsd-parser');?></h6>
                                 <p class="card-text text-dark">
                                     <?php if (JSD__PARSER_HELPERS::is_404($config['_api_path'])) : echo ' <span class="badge bg-success">ONLINE</span>'; else : echo ' <span class="badge bg-danger">Offline</span>'; endif; ?>
+                                </p>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <h6 class="text-black"><?php echo __('Data Sets:', 'jsd-parser');?></h6>
+                                <p class="card-text text-dark">
+                                    <?php
+                                    $all_xml_products = get_option(JSD__PARSER_FACTORY::$wp_options_slugs['products_from_xml']);
+                                    $chunks = get_option(JSD__PARSER_FACTORY::$wp_options_slugs['cycle_chunks']);
+                                    $data_sets = array_chunk($all_xml_products, $chunks);
+                                    echo $data_sets;
+                                    ?>
+                                </p>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <h6 class="text-black"><?php echo __('Next Iteration:', 'jsd-parser');?></h6>
+                                <p class="card-text text-dark">
+                                    <?php
+                                    echo get_option(JSD__PARSER_FACTORY::$wp_options_slugs['cycle_next_position']);
+                                    ?>
                                 </p>
                             </div>
                             <div class="my-3">

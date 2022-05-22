@@ -40,7 +40,7 @@ function load_raw_data_brel($config) {
             $desc = JSD__PARSER_MAPPING::get_description((string) $product->ProductDescription);
             $short_desc = '';
             $price = JSD__PARSER_MAPPING::calculate_price((string) $product->ProductPrice_VAT, 1);
-            $stock = JSD__PARSER_MAPPING::get_stock_status((string)$product->ProductInventory, ['instock' => 'Skladom', 'outofstock' => 'Na objednávku', 'onbackorder' => '',]);
+            $stock = JSD__PARSER_MAPPING::get_stock_status((string)$product->ProductInventory, ['instock' => 'Skladom', 'outofstock' => '', 'onbackorder' => 'Na objednávku',]);
             $exist = JSD__PARSER_MAPPING::check_if_product_exist($jsdID);
 
             $imported[$i] = [
@@ -93,23 +93,27 @@ function add_fifteen_minute_cron_interval( $schedules ) {
 }
 
 register_activation_hook(__FILE__, 'brel_cron_job_activation');
- 
+
 function brel_cron_job_activation() {
-    if (! wp_next_scheduled ( 'brel_importer_cron_job' )) {
-    wp_schedule_event(time(), 'fifteen_minutes', 'brel_importer_cron_job', [$api_name]);
+    if (! wp_next_scheduled ( 'brel_cron_job_import' )) {
+    wp_schedule_event(time(), 'fifteen_minutes', 'brel_cron_job_import');
     }
 }
  
-add_action('brel_importer_cron_job', 'brel_cron_job');
- 
+add_action('brel_cron_job_import', 'brel_cron_job');
 function brel_cron_job($api_name) {
     $slugs = JSD__PARSER_FACTORY::create_options_slugs($api_name);
     $config = get_option($slugs['implementation_config']);
-    if (date('D') == 'Sat') :
-        delete_option($slugs['initiated_implementation']);
-        $imported = load_raw_data_brel($config);
-        new JSD__PARSER_FACTORY($config, $imported);
-    endif;
     $products = get_option($slugs['products_from_xml']);
     new JSD__PARSER_CYCLE($config, $products);
 }
+
+add_action('brel_cron_job_reset_importer', 'brel_cron_reset_importer');
+function brel_cron_reset_importer() {
+    $slugs = JSD__PARSER_FACTORY::create_options_slugs($api_name);
+    delete_option($slugs['initiated_implementation']);
+    $imported = load_raw_data_brel($config);
+    new JSD__PARSER_FACTORY($config, $imported);
+}
+
+
