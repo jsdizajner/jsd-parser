@@ -11,6 +11,12 @@ if (!function_exists('get_plugin_data')) {
 
 class JSD__PARSER_CORE
 {
+	public static $current_data = [
+		'current_eshop_products' => 'jsd_parser_current_eshop_products' ,
+		'current_eshop_categories' => 'jsd_parser_current_eshop_categories',
+		'current_eshop_attributes' => 'jsd_parser_current_eshop_attributes',
+	];
+
 	public static $info = [
 		'name'      		=> JSD_PARSER_PLUGIN_DATA['Name'],
 		'author'    		=> JSD_PARSER_PLUGIN_DATA['Author'],
@@ -31,6 +37,7 @@ class JSD__PARSER_CORE
 	public static function init()
 	{
 
+		// Enable Plugin Updater
 		require JSD_PARSER_FRAMEWORK_DIR . '/vendor/yahnis-elsts/plugin-update-checker/plugin-update-checker.php';
 		$MyUpdateChecker = Puc_v4_Factory::buildUpdateChecker(
 			'https://github.com/jsdizajner/jsd-parser',
@@ -41,6 +48,11 @@ class JSD__PARSER_CORE
 		//Set the branch that contains the stable release.
         $MyUpdateChecker->setBranch('master');
         $MyUpdateChecker->getVcsApi()->enableReleaseAssets();
+
+		
+		// Load All imeplementations
+		require_once JSD_PARSER_FRAMEWORK_DIR . '/implementations/brel.php';
+
 	}
 
 }

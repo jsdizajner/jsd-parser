@@ -22,9 +22,11 @@ define('JSD_PARSER_PLUGIN_DATA', get_plugin_data(__FILE__));
 
 require __DIR__ . '/vendor/autoload.php';
 require 'class.core.php';
+require 'class.factory.php';
+require 'class.mapping.php';
 require 'class.xml.php';
 require 'class.helper.php';
-require 'class.factory.php';
+require 'class.cycle.php';
 
 // Initiate Core Framework Functionality
 new JSD__PARSER_CORE();
