@@ -48,11 +48,6 @@ class JSD__PARSER_CORE
 		//Set the branch that contains the stable release.
         $MyUpdateChecker->setBranch('master');
         $MyUpdateChecker->getVcsApi()->enableReleaseAssets();
-
-		
-		// Load All imeplementations
-		require_once JSD_PARSER_FRAMEWORK_DIR . '/implementations/brel.php';
-
 	}
 
 }

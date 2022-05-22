@@ -55,14 +55,14 @@ class JSD__PARSER_CYCLE extends JSD__PARSER_FACTORY
      */
     public function cycle($position)
     {
+        $data_sets = $this->data_sets;
+        $cycles = $this->cycles;
+
         if ($position > $cycles) : update_option(self::$wp_options_slugs['cycle_is_finished'], true); return; endif;
         
         if (self::$wp_options_slugs['cycle_last_position'] === $position && $position != 0) : 
             return false;
         endif;
-
-        $data_sets = $this->data_sets;
-        $cycles = $this->cycles;
 
         // Collect Metadata for this cycle setup
         $this->cycle_metadata = [
@@ -214,7 +214,7 @@ class JSD__PARSER_CYCLE extends JSD__PARSER_FACTORY
                     update_post_meta($product_id, '_visibility', 'visible');
                     update_post_meta($product_id, '_stock_status', $product['stock_status']);
                     update_post_meta($product_id, '_manage_stock', $product['manage_stock']);
-                    update_post_meta($product_id, '_price', $product['price']);
+                    update_post_meta($product_id, '_regular_price', $product['price']);
 
                     if (isset($product['attributes'])) : update_post_meta($product_id, '_product_attributes', $product['attributes']); endif;
                     if (isset($product['_stock'])) : update_post_meta($product_id, '_stock', $product['_stock']); endif;
@@ -232,7 +232,7 @@ class JSD__PARSER_CYCLE extends JSD__PARSER_FACTORY
                     ];
 
                     update_post_meta($product['id'], '_stock_status', $product['stock_status']);
-                    update_post_meta($product['id'], '_price', $product['price']);
+                    update_post_meta($product['id'], '_regular_price', $product['price']);
 
                     $post_id = wp_update_post($post, true);
 
