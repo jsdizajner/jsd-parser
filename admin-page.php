@@ -7,6 +7,20 @@ if (isset($_POST['run_importer'])) {
     $products = get_option($slugs['products_from_xml']);
     new JSD__PARSER_CYCLE($config, $products);
 }
+if (isset($_POST['reset_importer'])) {
+    $slugs = JSD__PARSER_FACTORY::create_options_slugs('brel');
+    delete_option(JSD__PARSER_CORE::$current_data['current_eshop_products']);
+    JSD__PARSER_FACTORY::get_current_products(JSD__PARSER_CORE::$current_data['current_eshop_products']);
+    update_option($slugs['cycle_next_position'], 0);
+}
+if (isset($_POST['stop_importer'])) {
+    $slugs = JSD__PARSER_FACTORY::create_options_slugs('brel');
+    $all_xml_products = get_option($slugs['products_from_xml']);
+    $chunks = get_option($slugs['cycle_chunks']);
+    $data_sets = array_chunk($all_xml_products, $chunks);
+    $sets = count($data_sets) + 1;
+    update_option($slugs['cycle_next_position'], $sets);
+}
 
 ?>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
@@ -34,7 +48,7 @@ if (isset($_POST['run_importer'])) {
                                     $all_xml_products = get_option(JSD__PARSER_FACTORY::$wp_options_slugs['products_from_xml']);
                                     $chunks = get_option(JSD__PARSER_FACTORY::$wp_options_slugs['cycle_chunks']);
                                     $data_sets = array_chunk($all_xml_products, $chunks);
-                                    echo $data_sets;
+                                    echo count($data_sets);
                                     ?>
                                 </p>
                             </div>
@@ -54,9 +68,22 @@ if (isset($_POST['run_importer'])) {
                                 </p>
                             </div>
                         </section>
-                        <form method="post">
-                            <button type="submit" name="run_importer" class="btn btn-primary"><?php echo __('Run Importer', 'jsd-parser'); ?></button>
-                        </form>
+                        <div class="d-flex my-2">
+                            <form method="post">
+                                <button type="submit" name="run_importer" class="btn btn-primary"><?php echo __('Run Importer', 'jsd-parser'); ?></button>
+                            </form>
+                        </div>
+                        <div class="d-flex my-2">
+                            <form method="post">
+                                <button type="submit" name="reset_importer" class="btn btn-warning"><?php echo __('Reset Importer', 'jsd-parser'); ?></button>
+                            </form>
+                        </div>
+                        <div class="d-flex my-2">
+                            <form method="post">
+                                <button type="submit" name="stop_importer" class="btn btn-danger"><?php echo __('Stop Importer', 'jsd-parser'); ?></button>
+                            </form>
+                        </div>
+
                     </div>
                 </div>
             </div>
