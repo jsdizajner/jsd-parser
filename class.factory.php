@@ -110,12 +110,12 @@ class JSD__PARSER_FACTORY
      * @param boolean $force
      * @return void
      */
-    public static function get_current_data($force = false)
+    public static function get_current_data($force)
     {  
         if ($force === true) :
             delete_option(JSD__PARSER_CORE::$current_data['current_eshop_products']);
-            delete_option(JSD__PARSER_CORE::$current_data['current_eshop_products']);
-            delete_option(JSD__PARSER_CORE::$current_data['current_eshop_products']);
+            delete_option(JSD__PARSER_CORE::$current_data['current_eshop_categories']);
+            delete_option(JSD__PARSER_CORE::$current_data['current_eshop_attributes']);
         endif;
         // Current Products
         if (get_option(JSD__PARSER_CORE::$current_data['current_eshop_products']) === false) : self::get_current_products(JSD__PARSER_CORE::$current_data['current_eshop_products']); endif;
@@ -300,26 +300,34 @@ class JSD__PARSER_FACTORY
     public static function get_current_products($option)
     {
         global $wpdb;
-        $data = $wpdb->get_results("SELECT 
+        $posts = 'wp_posts';
+        $post_meta = 'wp_postmeta';
+        $wp_term_relationships = 'wp_term_relationships';
+        $wp_term_taxonomy = 'wp_term_taxonomy';
+        $wp_terms = 'wp_terms';
+
+        $query = $wpdb->prepare("SELECT 
         p.ID, p.post_title,
         MAX(CASE WHEN t.name = 'simple' then t.name END) as product_type,
         MAX(CASE WHEN pm1.meta_key = '_unique_import_id_field' then pm1.meta_value ELSE NULL END) as jsd_id,
         MAX(CASE WHEN pm1.meta_key = '_stock_status' then pm1.meta_value ELSE NULL END) as stock_status,
         MAX(CASE WHEN pm1.meta_key = '_alg_ean' then pm1.meta_value ELSE NULL END) as ean
-        FROM wp_posts p 
-        LEFT JOIN wp_postmeta pm1 ON pm1.post_id = p.ID
-        LEFT JOIN wp_term_relationships AS tr ON tr.object_id = p.ID
-        JOIN wp_term_taxonomy AS tt ON tt.taxonomy = 'product_type' AND tt.term_taxonomy_id = tr.term_taxonomy_id 
-        JOIN wp_terms AS t ON t.term_id = tt.term_id
+        FROM %1s p 
+        LEFT JOIN %2s pm1 ON pm1.post_id = p.ID
+        LEFT JOIN %3s AS tr ON tr.object_id = p.ID
+        JOIN %4s AS tt ON tt.taxonomy = 'product_type' AND tt.term_taxonomy_id = tr.term_taxonomy_id 
+        JOIN %5s t ON t.term_id = tt.term_id
         WHERE p.post_type in('product') AND p.post_status = 'publish' AND p.post_content <> ''
-        GROUP BY p.ID,p.post_title", ARRAY_A);
+        GROUP BY p.ID,p.post_title", $posts, $post_meta, $wp_term_relationships, $wp_term_taxonomy, $wp_terms);
+        $results = $wpdb->get_results($query, ARRAY_A);
 
         $i = 0;
         $final = [];
-        foreach ($data as $set) {
+        foreach ($results as $set) {
             $final[$i] = $set;
             $i++;
         }
+
         update_option($option, $final);
     }
 
@@ -345,17 +353,18 @@ class JSD__PARSER_FACTORY
     public static function get_current_product_categories($option)
     {
         global $wpdb;
-        $data = $wpdb->get_results("SELECT wp_term_taxonomy.term_id, wp_terms.name FROM wp_term_relationships 
-        LEFT JOIN wp_term_taxonomy ON (wp_term_relationships.term_taxonomy_id = wp_term_taxonomy.term_taxonomy_id) 
-        LEFT JOIN wp_terms ON (wp_terms.term_id = wp_term_taxonomy.term_taxonomy_id) 
-        WHERE wp_term_taxonomy.taxonomy = 'product_cat' 
-        GROUP BY wp_term_taxonomy.term_id 
-        order by wp_terms.name", ARRAY_A);
+        $wp_term_relationships = 'wp_term_relationships';
+        $wp_term_taxonomy = 'wp_term_taxonomy';
+        $wp_terms = 'wp_terms';
+        $query = $wpdb->prepare("SELECT %1s.term_id, %2s.name FROM %3s 
+        LEFT JOIN %1s ON (%3s.term_taxonomy_id = %1s.term_taxonomy_id) 
+        LEFT JOIN %2s ON (%2s.term_id = %1s.term_taxonomy_id) 
+        WHERE %1s.taxonomy = 'product_cat' 
+        GROUP BY %1s.term_id 
+        order by %2s.name", $wp_term_taxonomy, $wp_terms, $wp_term_relationships, $wp_term_taxonomy, $wp_term_relationships, $wp_term_taxonomy, $wp_terms, $wp_terms, $wp_term_taxonomy, $wp_term_taxonomy, $wp_term_taxonomy, $wp_terms);
+        $data = $wpdb->get_results($query, ARRAY_A);
 
-        $data['last_update'] = date('d-m-Y');
         update_option($option, $data);
-
-        return $data['last_update'];
     }
 
     /**

@@ -89,6 +89,9 @@ function add_fifteen_minute_cron_interval( $schedules ) {
     $schedules['fifteen_minutes'] = array(
         'interval' => 900,
         'display'  => esc_html__( 'Every 15 minutes' ), );
+    $schedules['eight_and_half_minutes'] = array(
+        'interval' => 510,
+        'display'  => esc_html__( 'Eight and Half Minutes' ), );
     return $schedules;
 }
 
@@ -101,8 +104,8 @@ function brel_cron_job_activation() {
 }
  
 add_action('brel_cron_job_import', 'brel_cron_job');
-function brel_cron_job($api_name) {
-    $slugs = JSD__PARSER_FACTORY::create_options_slugs($api_name);
+function brel_cron_job() {
+    $slugs = JSD__PARSER_FACTORY::create_options_slugs('brel');
     $config = get_option($slugs['implementation_config']);
     $products = get_option($slugs['products_from_xml']);
     new JSD__PARSER_CYCLE($config, $products);
@@ -110,7 +113,7 @@ function brel_cron_job($api_name) {
 
 add_action('brel_cron_job_reset_importer', 'brel_cron_reset_importer');
 function brel_cron_reset_importer() {
-    $slugs = JSD__PARSER_FACTORY::create_options_slugs($api_name);
+    $slugs = JSD__PARSER_FACTORY::create_options_slugs('brel');
     delete_option($slugs['initiated_implementation']);
     $imported = load_raw_data_brel($config);
     new JSD__PARSER_FACTORY($config, $imported);
